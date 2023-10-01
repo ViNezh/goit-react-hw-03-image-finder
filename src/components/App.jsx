@@ -92,7 +92,7 @@ class App extends Component {
   };
   // Скидання state при новому значенні пошукового запиту
   resetPage = () => {
-    this.setState({ images: [], currentPage: 1 });
+    this.setState({ images: [] });
   };
   // Функція прокручування вмісту екрану до кнопки load more, якщо вона показана, або до кінця галереї
   scrolling = () => {
