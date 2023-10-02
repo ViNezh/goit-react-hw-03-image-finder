@@ -22,46 +22,51 @@ class App extends Component {
   };
   // При оновленні state наповнюємо галерею картками
   componentDidUpdate(prevProps, prevState) {
+    const { searchQuery, currentPage } = this.state;
     const prevQuery = prevState.searchQuery;
-    const nextQuery = this.state.searchQuery;
     const prevPage = prevState.currentPage;
-    const nextPage = this.state.currentPage;
+
     // При новому слові запиту, викликаємо функцію нового запиту
-    if (prevQuery !== nextQuery) {
-      this.fetchNewQuery(nextQuery);
-    }
-    // При зміні номеру сторінки завантажуємо додаткові картки
-    if (prevPage !== nextPage) {
-      this.fetchNextPage(prevQuery, nextPage);
+    if (prevQuery !== searchQuery || prevPage !== currentPage) {
+      this.fetchQuery();
     }
     // Після завантаження нових карток автоматично прокручуємо екран вниз
-    const { images } = this.state;
-    if (images.length > prevState.images.length) {
-      this.scrolling();
-    }
+    // const { images } = this.state;
+    // if (images.length > prevState.images.length) {
+    //   this.scrolling();
+    // }
   }
   // Функція обробки форми з пошуковим запитом
   searchSubmit = searchQuery => {
-    this.setState({ searchQuery });
+    this.setState({
+      searchQuery,
+      currentPage: 1,
+      images: [],
+      totalHits: 0,
+    });
+  };
+  // Функція зміни номеру сторінки після натискання кнопки Load more
+  addPage = () => {
+    this.setState(prevState => ({ currentPage: prevState.currentPage + 1 }));
   };
   // Функція отримання інформації з backend при новому пошуковому запиті
-  fetchNewQuery = async newQuery => {
+  fetchQuery = async newQuery => {
+    const { searchQuery, currentPage } = this.state;
     try {
       //Показуємо loader
       this.setState({ isLoading: true });
-      // очищаємо вміст галереї
-      this.resetPage();
       // Викликаємо функцію http запиту
-      const data = await fetchImages(newQuery);
+      const data = await fetchImages(searchQuery, currentPage);
       // Якщо отримаємо порожній масив, просимо ввести валідний пошуковий запит
       if (data.hits.length === 0) {
         toast.error('Enter valid search query');
         return;
       }
-      this.setState({
-        images: [...data.hits],
+      this.setState(prevState => ({
+        images: [...prevState.images, ...data.hits],
         totalHits: data.totalHits,
-      });
+        error: null,
+      }));
     } catch (error) {
       this.setState({ error: error.message });
       toast.error(
@@ -72,40 +77,20 @@ class App extends Component {
       this.setState({ isLoading: false });
     }
   };
-  // Функція отримання інформації з backend при натисканні кнопки load more(зміна номеру сторінки)
-  fetchNextPage = async (prevQuery, nextPage) => {
-    try {
-      this.setState({ isLoading: true });
-      const data = await fetchImages(prevQuery, nextPage);
-      this.setState(prevState => ({
-        images: [...prevState.images, ...data.hits],
-      }));
-    } catch (error) {
-      this.setState({ error: error.message });
-    } finally {
-      this.setState({ isLoading: false });
-    }
-  };
-  // Функція зміни номеру сторінки після натискання кнопки Load more
-  addPage = () => {
-    this.setState(prevState => ({ currentPage: prevState.currentPage + 1 }));
-  };
-  // Скидання state при новому значенні пошукового запиту
-  resetPage = () => {
-    this.setState({ images: [] });
-  };
+
   // Функція прокручування вмісту екрану до кнопки load more, якщо вона показана, або до кінця галереї
-  scrolling = () => {
-    const btnLoadMore = document.querySelector('#loadMore');
-    if (btnLoadMore) {
-      btnLoadMore.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-    const lastImage = document.querySelector('#ImageGallery').lastElementChild;
-    if (!btnLoadMore) {
-      lastImage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-  };
-  // Функція виклику модалного вікна
+  // scrolling = () => {
+  //   const btnLoadMore = document.querySelector('#loadMore');
+  //   if (btnLoadMore) {
+  //     btnLoadMore.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  //   }
+  //   const lastImage = document.querySelector('#ImageGallery').lastElementChild;
+  //   if (!btnLoadMore) {
+  //     lastImage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  //   }
+  // };
+
+  // Функція виклику модального вікна
   handleImageClick = largeImageURL => {
     this.setState({ isModal: true, largeImageURL });
   };
@@ -115,14 +100,14 @@ class App extends Component {
   };
 
   render() {
-    const length = this.state.images.length;
-    const total = this.state.totalHits;
+    const { images, totalHits, isLoading, isModal, largeImageURL } = this.state;
+    const isButtonShow = images.length !== totalHits && !isLoading;
     return (
       <>
         <Searchbar handleSubmit={this.searchSubmit} />
         <ImageGallery>
-          {length > 0 &&
-            this.state.images.map(image => (
+          {images.length > 0 &&
+            images.map(image => (
               <ImageGalleryItem
                 source={image.webformatURL}
                 deskr={image.tags}
@@ -133,15 +118,10 @@ class App extends Component {
               />
             ))}
         </ImageGallery>
-        {length > 0 && length < total && !this.state.isLoading && (
-          <Button onClick={this.addPage} />
-        )}
-        {this.state.isLoading && <Loader />}
-        {this.state.isModal && (
-          <Modal
-            onClose={this.handleCloseModal}
-            largeImage={this.state.largeImageURL}
-          />
+        {isButtonShow && <Button onClick={this.addPage} />}
+        {isLoading && <Loader />}
+        {isModal && (
+          <Modal onClose={this.handleCloseModal} largeImage={largeImageURL} />
         )}
         <ToastContainer
           position="top-center"

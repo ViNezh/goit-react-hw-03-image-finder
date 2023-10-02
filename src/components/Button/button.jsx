@@ -8,7 +8,6 @@ export const Button = ({ onClick }) => {
       onClick={() => {
         onClick();
       }}
-      id="loadMore"
       aria-label="Button load more images"
     >
       Load more
